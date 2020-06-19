@@ -148,13 +148,14 @@ public class AdminRoleController {
     private ApplicationContext context;
     private List<PermVo> systemPermissions = null;
     private Set<String> systemPermissionsString = null;
+    private List<Permission> originalSystemPermissions = null;
 
     private List<PermVo> getSystemPermissions() {
         final String basicPackage = "org.linlinjava.litemall.admin";
         if (systemPermissions == null) {
-            List<Permission> permissions = PermissionUtil.listPermission(context, basicPackage);
-            systemPermissions = PermissionUtil.listPermVo(permissions);
-            systemPermissionsString = PermissionUtil.listPermissionString(permissions);
+            originalSystemPermissions = PermissionUtil.listPermission(context, basicPackage);
+            systemPermissions = PermissionUtil.listPermVo(originalSystemPermissions);
+            systemPermissionsString = PermissionUtil.listPermissionString(originalSystemPermissions);
         }
         return systemPermissions;
     }
@@ -182,9 +183,10 @@ public class AdminRoleController {
     @RequiresPermissionsDesc(menu = {"系统管理", "角色管理"}, button = "权限详情")
     @GetMapping("/permissions")
     public Object getPermissions(Integer roleId) {
-        List<PermVo> systemPermissions = getSystemPermissions();
-        Set<String> assignedPermissions = getAssignedPermissions(roleId);
 
+        Set<String> assignedPermissions = getAssignedPermissions(roleId);
+//        List<PermVo> systemPermissions = getSystemPermissions();
+        List<PermVo> systemPermissions = getAssignedPermissionsTree(assignedPermissions);
         Map<String, Object> data = new HashMap<>();
         data.put("systemPermissions", systemPermissions);
         data.put("assignedPermissions", assignedPermissions);
@@ -224,4 +226,18 @@ public class AdminRoleController {
         return ResponseUtil.ok();
     }
 
+    private List<PermVo> getAssignedPermissionsTree(Set<String> assignedPermissions) {
+        final String basicPackage = "org.linlinjava.litemall.admin";
+        if (originalSystemPermissions == null) {
+            originalSystemPermissions = PermissionUtil.listPermission(context, basicPackage);
+        }
+        Iterator<Permission> iterator = originalSystemPermissions.iterator();
+        while (iterator.hasNext()) {
+            Permission permission = iterator.next();
+            if (!assignedPermissions.contains(permission.getRequiresPermissions().value()[0])) {
+                iterator.remove();
+            }
+        }
+        return PermissionUtil.listPermVo(originalSystemPermissions);
+    }
 }
