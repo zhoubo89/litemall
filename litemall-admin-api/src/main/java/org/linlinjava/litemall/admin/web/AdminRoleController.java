@@ -231,13 +231,15 @@ public class AdminRoleController {
         if (originalSystemPermissions == null) {
             originalSystemPermissions = PermissionUtil.listPermission(context, basicPackage);
         }
-        Iterator<Permission> iterator = originalSystemPermissions.iterator();
+        List<Permission> assignedSystemPermissions = new ArrayList<>(originalSystemPermissions.size());
+        assignedSystemPermissions.addAll(originalSystemPermissions);
+        Iterator<Permission> iterator = assignedSystemPermissions.iterator();
         while (iterator.hasNext()) {
             Permission permission = iterator.next();
             if (!assignedPermissions.contains(permission.getRequiresPermissions().value()[0])) {
                 iterator.remove();
             }
         }
-        return PermissionUtil.listPermVo(originalSystemPermissions);
+        return PermissionUtil.listPermVo(assignedSystemPermissions);
     }
 }
