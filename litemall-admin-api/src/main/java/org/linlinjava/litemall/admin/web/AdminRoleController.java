@@ -2,7 +2,9 @@ package org.linlinjava.litemall.admin.web;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
+import org.apache.shiro.subject.Subject;
 import org.linlinjava.litemall.admin.annotation.RequiresPermissionsDesc;
 import org.linlinjava.litemall.admin.util.AdminResponseCode;
 import org.linlinjava.litemall.admin.util.Permission;
@@ -20,6 +22,7 @@ import org.linlinjava.litemall.db.service.LitemallPermissionService;
 import org.linlinjava.litemall.db.service.LitemallRoleService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -165,7 +168,9 @@ public class AdminRoleController {
         // 之所以这么做，是因为前端不能识别超级权限，所以这里需要转换一下。
         Set<String> assignedPermissions = null;
         if (permissionService.checkSuperPermission(roleId)) {
-            getSystemPermissions();
+            if (CollectionUtils.isEmpty(systemPermissionsString)){
+                getSystemPermissions();
+            }
             assignedPermissions = systemPermissionsString;
         } else {
             assignedPermissions = permissionService.queryByRoleId(roleId);
@@ -183,10 +188,12 @@ public class AdminRoleController {
     @RequiresPermissionsDesc(menu = {"系统管理", "角色管理"}, button = "权限详情")
     @GetMapping("/permissions")
     public Object getPermissions(Integer roleId) {
-
+        //1:获取当前管理员角色对应权限
+        Set<String> loginUserPermissions = loginUserPermissions();
+        //2：把当前登陆角色权限组装为树
+        List<PermVo> systemPermissions = getAssignedPermissionsTree(loginUserPermissions);
+        //3：获取输入角色现有权限
         Set<String> assignedPermissions = getAssignedPermissions(roleId);
-//        List<PermVo> systemPermissions = getSystemPermissions();
-        List<PermVo> systemPermissions = getAssignedPermissionsTree(assignedPermissions);
         Map<String, Object> data = new HashMap<>();
         data.put("systemPermissions", systemPermissions);
         data.put("assignedPermissions", assignedPermissions);
@@ -241,5 +248,19 @@ public class AdminRoleController {
             }
         }
         return PermissionUtil.listPermVo(assignedSystemPermissions);
+    }
+    private Set<String> loginUserPermissions(){
+        Subject currentUser = SecurityUtils.getSubject();
+        LitemallAdmin admin = (LitemallAdmin) currentUser.getPrincipal();
+        Integer[] roleIds = admin.getRoleIds();
+        Set<String> roles = roleService.queryByIds(roleIds);
+        Set<String> permissions = permissionService.queryByRoleIds(roleIds);
+        if (!CollectionUtils.isEmpty(permissions) && permissions.contains("*")){
+            if (CollectionUtils.isEmpty(systemPermissionsString)){
+                getSystemPermissions();
+            }
+            return systemPermissionsString;
+        }
+        return permissions;
     }
 }
